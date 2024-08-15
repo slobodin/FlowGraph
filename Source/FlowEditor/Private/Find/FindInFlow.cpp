@@ -1,10 +1,16 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright https://github.com/MothCocoon/FlowGraph/graphs/contributors
+
 #include "Find/FindInFlow.h"
+#include "Asset/FlowAssetEditor.h"
+#include "Graph/FlowGraphEditor.h"
+#include "Graph/FlowGraphUtils.h"
+#include "Graph/Nodes/FlowGraphNode.h"
 
 #include "FlowAsset.h"
-#include "Asset/FlowAssetEditor.h"
+#include "Nodes/FlowNode.h"
+#include "Nodes/Route/FlowNode_SubGraph.h"
+
 #include "EdGraph/EdGraph.h"
-#include "Graph/FlowGraphEditor.h"
 #include "EdGraph/EdGraphNode.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Views/ITypedTableView.h"
@@ -17,10 +23,6 @@
 #include "Math/Color.h"
 #include "Misc/Attribute.h"
 #include "SlotBase.h"
-#include "Graph/FlowGraphUtils.h"
-#include "Graph/Nodes/FlowGraphNode.h"
-#include "Nodes/FlowNode.h"
-#include "Nodes/Route/FlowNode_SubGraph.h"
 #include "Styling/AppStyle.h"
 #include "Styling/SlateColor.h"
 #include "Templates/Casts.h"
@@ -81,26 +83,29 @@ FReply FFindInFlowResult::OnClick(TWeakPtr<class FFlowAssetEditor> FlowAssetEdit
 	return FReply::Handled();
 }
 
-FReply FFindInFlowResult::OnDoubleClick(TSharedPtr<FFindInFlowResult> Root)
+FReply FFindInFlowResult::OnDoubleClick(TSharedPtr<FFindInFlowResult> Root) const
 {
 	if (!Parent.IsValid() || !bIsSubGraphNode)
 	{
 		return FReply::Handled();
 	}
 	const UFlowGraphNode* ParentGraphNode = Cast<UFlowGraphNode>(Parent.Pin()->GraphNode);
-	if (!ParentGraphNode || !ParentGraphNode->GetFlowNode())
+	if (!ParentGraphNode || !ParentGraphNode->GetFlowNodeBase())
 	{
 		return FReply::Handled();
 	}
-	
-	if (UObject* AssetToEdit = ParentGraphNode->GetFlowNode()->GetAssetToEdit())
+
+	if (UFlowNode* FlowNode = Cast<UFlowNode>(ParentGraphNode->GetFlowNodeBase()))
 	{
-		UAssetEditorSubsystem* AssetEditorSubsystem = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>();
-		if (AssetEditorSubsystem->OpenEditorForAsset(AssetToEdit))
+		if (UObject* AssetToEdit = FlowNode->GetAssetToEdit())
 		{
-			if (const TSharedPtr<FFlowAssetEditor> FlowAssetEditor = FFlowGraphUtils::GetFlowAssetEditor(GraphNode->GetGraph()))
+			UAssetEditorSubsystem* AssetEditorSubsystem = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>();
+			if (AssetEditorSubsystem->OpenEditorForAsset(AssetToEdit))
 			{
-				FlowAssetEditor->JumpToNode(GraphNode.Get());
+				if (const TSharedPtr<FFlowAssetEditor> FlowAssetEditor = FFlowGraphUtils::GetFlowAssetEditor(GraphNode->GetGraph()))
+				{
+					FlowAssetEditor->JumpToNode(GraphNode.Get());
+				}
 			}
 		}
 	}
@@ -134,9 +139,9 @@ FString FFindInFlowResult::GetNodeTypeText() const
 	{
 		FString NodeClassName;
 		const UFlowGraphNode* FlowGraphNode = Cast<UFlowGraphNode>(GraphNode.Get());
-		if (FlowGraphNode && FlowGraphNode->GetFlowNode())
+		if (FlowGraphNode && FlowGraphNode->GetFlowNodeBase())
 		{
-			NodeClassName = FlowGraphNode->GetFlowNode()->GetClass()->GetName();
+			NodeClassName = FlowGraphNode->GetFlowNodeBase()->GetClass()->GetName();
 		}
 		else
 		{
@@ -279,12 +284,12 @@ void SFindInFlow::InitiateSearch()
 void SFindInFlow::MatchTokens(const TArray<FString>& Tokens)
 {
 	RootSearchResult.Reset();
-
-	const TWeakPtr<SGraphEditor> FocusedGraphEditor = FlowAssetEditorPtr.Pin()->GetFlowGraph();
+	
 	const UEdGraph* Graph = nullptr;
+	const TSharedPtr<SFlowGraphEditor> FocusedGraphEditor = FlowAssetEditorPtr.Pin()->GetFlowGraph();
 	if (FocusedGraphEditor.IsValid())
 	{
-		Graph = FocusedGraphEditor.Pin()->GetCurrentGraph();
+		Graph = FocusedGraphEditor->GetCurrentGraph();
 	}
 
 	if (Graph == nullptr)
@@ -307,7 +312,7 @@ void SFindInFlow::MatchTokens(const TArray<FString>& Tokens)
 			FString NodeDescription = FlowGraphNode->GetNodeDescription();
 			NodeSearchString += NodeDescription;
 			
-			UFlowNode_SubGraph* SubGraphNode = Cast<UFlowNode_SubGraph>(FlowGraphNode->GetFlowNode());
+			UFlowNode_SubGraph* SubGraphNode = Cast<UFlowNode_SubGraph>(FlowGraphNode->GetFlowNodeBase());
 			if (bFindInSubGraph && SubGraphNode)
 			{
 				if (const UFlowAsset* FlowAsset = Cast<UFlowAsset>(SubGraphNode->GetAssetToEdit()); FlowAsset && FlowAsset->GetGraph())

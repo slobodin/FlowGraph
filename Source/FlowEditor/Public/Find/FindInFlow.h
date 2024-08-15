@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright https://github.com/MothCocoon/FlowGraph/graphs/contributors
 
 #pragma once
 
@@ -42,7 +42,7 @@ public:
 	FReply OnClick(TWeakPtr<class FFlowAssetEditor> FlowAssetEditor,  TSharedPtr<FFindInFlowResult> Root);
 	
 	/** Called when user double clicks on the search item */
-	FReply OnDoubleClick(TSharedPtr<FFindInFlowResult> Root);
+	FReply OnDoubleClick(TSharedPtr<FFindInFlowResult> Root) const;
 
 	/** Create an icon to represent the result */
 	TSharedRef<SWidget>	CreateIcon() const;
